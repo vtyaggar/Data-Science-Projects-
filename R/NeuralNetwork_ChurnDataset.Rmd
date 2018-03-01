@@ -1,0 +1,151 @@
+---
+title: "Neural network using R"
+
+---
+ 
+Neural Network can deal only with values within -1 and 1. Hence it is important to convert factor as indicator variables. 
+And normalize all other numeric variables. 
+```{r}
+trainDS_Churn <- read.csv('~/MSBA/Second Quarter/Data Mining/Assignments/DMPA_data_sets/Data sets/churn.txt', header = TRUE, sep=',',na.strings=c('','NA'))
+
+names(trainDS_Churn) <- c("State","Account.Length","Area.Code","Phone","Intl.Plan.","VMail.Plan","VMail.Message","Day.Mins" ,"Day.Calls" ,"Day.Charge","Eve.Mins" ,"Eve.Calls","Eve.Charge","Night.Mins","Night.Calls" ,"Night.Charge","Intl.Mins" ,"Intl.Calls","Intl.Charge","CustServ.Calls" ,"Churn")
+
+# Set Indicator Variables
+
+trainDS_Churn$Intl.Plan1. <- trainDS_Churn$VMail.Plan1 <- trainDS_Churn$Churn1<- trainDS_Churn$Phone1  <- c(rep(0,length(trainDS_Churn$Churn)))
+
+for (i in 1:length(trainDS_Churn$Churn)) { 
+  if(trainDS_Churn$Churn[i] == "True.") 
+    trainDS_Churn$Churn1[i] <- 1 
+  if(trainDS_Churn$VMail.Plan[i] == "yes") 
+    trainDS_Churn$VMail.Plan1[i] <- 1
+  if(trainDS_Churn$Intl.Plan.[i] == "yes") 
+    trainDS_Churn$Intl.Plan1.[i] <- 1 
+  
+}
+
+# Random sampling of training and test dataset 
+samplesize = 0.60 * nrow(trainDS_Churn)
+set.seed(80)
+index = sample( seq_len ( nrow ( trainDS_Churn ) ), size = samplesize )
+
+# Create training and test set
+datatrain = trainDS_Churn[ index, ]
+datatest = trainDS_Churn[ -index, ]
+
+
+```
+
+```{r}
+
+
+normalize <- function(x) {
+    return ((x - min(x)) / (max(x) - min(x)))
+}
+
+dfNorm <- as.data.frame(lapply(datatrain[sapply(datatrain,is.numeric)], normalize))
+
+#Removing Phone1 from the DS
+
+#dfNorm = select(dfNorm,-c(grep("Phone1", colnames(dfNorm))))
+head(dfNorm)
+```
+
+```{r}
+library(neuralnet)
+set.seed(121)
+# 
+
+churn_NN = neuralnet(Churn1 ~ Account.Length + Day.Mins+Day.Calls+Day.Charge+Eve.Mins+Eve.Calls+Eve.Charge+Night.Mins+Night.Calls+Night.Charge+Intl.Mins+Intl.Calls+Intl.Charge+CustServ.Calls+VMail.Plan1+Intl.Plan1. ,data=dfNorm, hidden=1, linear.output = T )
+
+
+```
+
+Topology of this  Neural Network:
+Input Nodes: 16
+Hidden Layer: 1
+Neurons: 16
+Total Nodes: 18
+```{r}
+ plot(churn_NN)
+```
+
+
+```{r}
+# Predict results using the Neural network model. Ensure the columns are the same in train and test dataset. 
+# Remove the prediction column  from test ds
+predictds <- as.data.frame(lapply(datatest[sapply(datatest,is.numeric)], normalize))
+
+#head(predictds)
+
+predictNeuralNt <- compute(churn_NN, predictds[,-c(2:3,17,18)])
+
+
+predictNeuralNt_descaled <- predictNeuralNt$net.result*(max(predictds$Churn1)-min(predictds$Churn1))+min(predictds$Churn1)
+actVal_descaled <- predictds$Churn1*(max(predictds$Churn1)-min(predictds$Churn1))+min(predictds$Churn1)
+
+# checking the accuracy of results
+results <- data.frame(actual = predictds$Churn1, prediction = predictNeuralNt$net.result)
+
+
+plot(predictds$Churn1, predictNeuralNt$net.result, col='blue', pch=16, ylab = "predicted Churn_NeuralNt", xlab = "ACtual Churn")
+
+abline(0,1)
+#table(results$actual, results$prediction)
+
+
+# Prediction Error by Neural Network
+MSE <- sum((predictNeuralNt_descaled- actVal_descaled)^2)/nrow(predictds)
+print(MSE)
+
+
+
+#verify if lm model does better than NN
+#lm.fit <- glm(medv~., data=train)
+#summary(lm.fit)
+#pr.lm <- predict(lm.fit,test)
+#MSE.lm <- sum((pr.lm - test$medv)^2)/nrow(test)
+```
+Now increasing the hidden layer and repeating the process to verify the impact on MSE
+Error is 0.091 for 2 hidden layers
+Error is 0.090 for 1 hidden layer
+
+One hiddden layer seems to be better and the prediction results are also accurate.
+
+The Error is almost zero which indicates accuracy of the model. 
+
+Correlation matrix can also be run after the modeling to verify if it creates over fitting. 
+
+Selection of variables based on the weight contribution 
+
+```{r}
+#confusion matrix
+library(dplyr)
+library(caret)
+library(ggplot2)
+library(lattice)
+library(e1071)
+Conf_Matrix <- confusionMatrix(data=round(results$prediction, digits = 0), reference=results$actual)
+print(Conf_Matrix)
+
+#Variable Importance of the Neural Networl
+library(NeuralNetTools)
+
+NeuralNetTools::garson(churn_NN) 
+
+# Sensitivity Analaysis
+senst <- NeuralNetTools::lekprofile(churn_NN,val_out=F)
+
+```
+Variable selections are made here based on the results from the Neural network model.
+Sensitivity Analysis is performed. 
+
+From the Confusion matrix, the number of churn rate predictions: 
+True positive: 1124
+False Negative: 140 (140 customers predicted predicted as "not churn" when it is an actual churn. Need to analyze the cost impact in terms of money spent on promotions and offers since the customer is not expected to churn)
+False positive: 0 (Not classifying any existing customer as churn which is good)
+True Negative: 70
+
+Sensitivity indicates the model could correctly classify the values 100% of churn rate which are actual churn. (True positive scenario)
+
+Specificity indicates the True Negative scenario where it calculates the cases without churn 33% accurate where it is not a churn actually. 
