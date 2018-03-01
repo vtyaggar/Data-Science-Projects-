@@ -1,9 +1,7 @@
 # get working directory 
 import os
 os.getcwd()
-# parse txt file data source
-import numpy as np
-data = np.genfromtxt('/Data Mining/baseball - Copy.txt', dtype='string', delimiter=None)
+
 
 import pandas as pd
 from pandas import ExcelFile
