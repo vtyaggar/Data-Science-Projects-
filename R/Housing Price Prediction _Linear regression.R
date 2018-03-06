@@ -3,7 +3,7 @@ library(XLConnectJars)
 library(tidyverse)
 getwd()
 setwd("Labs/Linear Regression OLS")
-wk = loadWorkbook("Assignment3_CategoricalLab.xlsx") 
+wk = loadWorkbook("CategoricalLab.xlsx") 
 redfinHousingData =  readWorksheet(wk, "Sheet2")
 
 rainsheet = readWorksheet(wk, "Sheet2")
